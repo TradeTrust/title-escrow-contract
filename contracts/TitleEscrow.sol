@@ -1,4 +1,4 @@
-pragma solidity ^0.5.5;
+pragma solidity ^0.5.11;
 
 import "./ERC721.sol";
 
@@ -23,10 +23,9 @@ contract HasHolder is Context {
     address public holder;
     
     event HolderChanged(address indexed previousHolder, address indexed newHolder);
-    constructor () internal {
-        address msgSender = _msgSender();
-        holder = msgSender;
-        emit HolderChanged(address(0), msgSender);
+    constructor (address _holder) internal {
+        holder = _holder;
+        emit HolderChanged(address(0), _holder);
     }
 
     modifier onlyHolder() {
@@ -47,11 +46,15 @@ contract HasHolder is Context {
 
 contract TitleEscrow is Context, IERC721Receiver, HasNamedBeneficiary, HasHolder  {
     event TitleReceived(address indexed _tokenRegistry, address indexed _from, uint256 indexed _id);
+    event TransferEndorsed(uint256 indexed _tokenid, address indexed _from, address indexed _to);
+
+    enum StatusTypes { Uninitialised, InUse, Exited }
     ERC721 public tokenRegistry;
     uint256 public _tokenId;
-    address approvedTransferTarget = address(0);
+    address private approvedTransferTarget = address(0);
+    StatusTypes status = StatusTypes.Uninitialised;
     
-    constructor(ERC721 _tokenRegistry, address _beneficiary) HasNamedBeneficiary(_beneficiary) public {
+    constructor(ERC721 _tokenRegistry, address _beneficiary, address _holder) HasNamedBeneficiary(_beneficiary) HasHolder(_holder) public {
         tokenRegistry = ERC721(_tokenRegistry);
     }
 
@@ -64,26 +67,37 @@ contract TitleEscrow is Context, IERC721Receiver, HasNamedBeneficiary, HasHolder
         public
         returns(bytes4)
     {
-        require(_msgSender() == address(tokenRegistry), "TitleEscrow: Token does not belong to correct token registry");
+        require(status == StatusTypes.Uninitialised, "TitleEscrow: Contract has been used before");
+        require(_msgSender() == address(tokenRegistry), "TitleEscrow: Only tokens from predefined token registry can be accepted");
         _tokenId = tokenId;
         emit TitleReceived(_msgSender(), from, _tokenId);
+        status = StatusTypes.InUse;
         return 0x150b7a02;
     }
     
-    function changeHolder(address newHolder) public onlyHolder {
+    function changeHolder(address newHolder) public isHoldingToken onlyHolder {
         _changeHolder(newHolder);
-        approvedTransferTarget = address(0); // clear any prior approvals since its not valid anymore
+    }
+
+    modifier isHoldingToken()  {
+        require(_tokenId != uint256(0), "TitleEscrow: Contract is not holding a token");
+        require(status == StatusTypes.InUse, "TitleEscrow: Contract is not in use");
+        require(tokenRegistry.ownerOf(_tokenId) == address(this),
+            "TitleEscrow: Contract is not the owner of token");
+        _;
     }
     
-    function approveTransfer(address newBeneficiary) public onlyHolder {
+    function endorseTransfer(address newBeneficiary) public isHoldingToken onlyBeneficiary {
+        emit TransferEndorsed(_tokenId, beneficiary, newBeneficiary);
         approvedTransferTarget = newBeneficiary;
     }
-    
-    function transferTo(address newBeneficiary) public onlyBeneficiary {
+
+    function transferTo(address newBeneficiary) public isHoldingToken onlyHolder {
+        require(newBeneficiary != address(0), "TitleEscrow: Transferring to 0x0 is not allowed");
         if (holder != beneficiary) {
-            require(newBeneficiary == approvedTransferTarget, "TitleEscrow: Transfer target has not been approved by holder.");
+            require(newBeneficiary == approvedTransferTarget, "TitleEscrow: Transfer target has not been endorsed by beneficiary");
         }
+        status = StatusTypes.Exited;
         tokenRegistry.safeTransferFrom(address(this), address(newBeneficiary), _tokenId);
     }
-    
 }
