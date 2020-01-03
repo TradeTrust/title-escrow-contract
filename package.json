@@ -1,0 +1,35 @@
+{
+  "name": "title-escrow-contract",
+  "version": "1.0.0",
+  "description": "",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "truffle test",
+    "lint": "./node_modules/.bin/solhint -f table contracts/**/*.sol",
+    "lint:fix": "./node_modules/.bin/prettier --write contracts/**/*.sol"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TradeTrust/title-escrow-contract.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TradeTrust/title-escrow-contract/issues"
+  },
+  "homepage": "https://github.com/TradeTrust/title-escrow-contract#readme",
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "prettier": "^1.19.1",
+    "prettier-plugin-solidity": "^1.0.0-alpha.35",
+    "solhint": "^2.3.0",
+    "solhint-plugin-prettier": "0.0.3"
+  },
+  "dependencies": {
+    "chai-as-promised": "^7.1.1",
+    "save-dev": "0.0.1-security"
+  }
+}
